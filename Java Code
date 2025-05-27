@@ -1,0 +1,197 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.text.DecimalFormat;
+
+public class CurrencyConverter extends JFrame {
+
+    private static final double DOLLAR_TO_POUND = 0.78;
+    private static final double DOLLAR_TO_RUPEE = 82.47;
+    private static final double POUND_TO_DOLLAR = 1.28;
+    private static final double POUND_TO_RUPEE = 105.63;
+    private static final double RUPEE_TO_DOLLAR = 0.012;
+    private static final double RUPEE_TO_POUND = 0.0095;
+
+    private final JComboBox<String> fromCurrency;
+    private final JComboBox<String> toCurrency;
+    private final JTextField amountField;
+    private final JLabel resultLabel;
+
+    // Database connection parameters
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/currencydb"; // Change to your database name
+    private static final String DB_USER = "root"; // Change to your database username
+    private static final String DB_PASSWORD = "root"; // Change to your database password
+
+    public CurrencyConverter() {
+        setTitle("Currency Converter");
+        setSize(550, 320);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setResizable(false);
+
+        JPanel panel = new JPanel();
+        panel.setBackground(new Color(42, 108, 150)); // Light sea green
+        panel.setLayout(null);
+
+        JLabel titleLabel = new JLabel("Currency Converter");
+        titleLabel.setFont(new Font("Segoe UI Black", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setBounds(110, 15, 300, 40);
+        panel.add(titleLabel);
+
+        JLabel fromLabel = new JLabel("From:");
+        fromLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        fromLabel.setForeground(Color.WHITE);
+        fromLabel.setBounds(50, 80, 80, 25);
+        panel.add(fromLabel);
+
+        fromCurrency = new JComboBox<>(new String[]{"Dollar", "Pound", "Rupee"});
+        fromCurrency.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        fromCurrency.setBounds(130, 75, 120, 35);
+        panel.add(fromCurrency);
+
+        JLabel toLabel = new JLabel("To:");
+        toLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        toLabel.setForeground(Color.WHITE);
+        toLabel.setBounds(280, 80, 80, 25);
+        panel.add(toLabel);
+
+        toCurrency = new JComboBox<>(new String[]{"Dollar", "Pound", "Rupee"});
+        toCurrency.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        toCurrency.setBounds(320, 75, 120, 35);
+        panel.add(toCurrency);
+
+        JLabel amountLabel = new JLabel("Amount:");
+        amountLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        amountLabel.setForeground(Color.WHITE);
+        amountLabel.setBounds(50, 130, 80, 25);
+        panel.add(amountLabel);
+
+        amountField = new JTextField();
+        amountField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        amountField.setBounds(130, 125, 150, 35);
+        panel.add(amountField);
+
+        JButton convertBtn = new JButton("Convert");
+        convertBtn.setFont(new Font("Segoe UI Semibold", Font.BOLD, 16));
+        convertBtn.setBackground(new Color(255, 140, 20)); // Dark orange
+        convertBtn.setForeground(Color.WHITE);
+        convertBtn.setFocusPainted(false);
+        convertBtn.setBounds(150, 185, 200, 40);
+        convertBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        panel.add(convertBtn);
+
+        resultLabel = new JLabel(" ");
+        resultLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        resultLabel.setForeground(Color.WHITE);
+        resultLabel.setBounds(50, 240, 380, 35);
+        resultLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        panel.add(resultLabel);
+
+        add(panel);
+
+        convertBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                convertCurrency();
+            }
+        });
+    }
+
+    private void convertCurrency() {
+        String from = (String) fromCurrency.getSelectedItem();
+        String to = (String) toCurrency.getSelectedItem();
+        String amountText = amountField.getText().trim();
+
+        if (amountText.isEmpty()) {
+            showError("Please enter an amount.");
+            return;
+        }
+
+        double amount;
+
+        try {
+            amount = Double.parseDouble(amountText);
+            if (amount < 0) {
+                showError("Please enter a positive amount.");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            showError("Invalid amount. Please enter a numeric value.");
+            return;
+        }
+
+        if (from.equals(to)) {
+            resultLabel.setText("From and To currencies are the same: " + format(amount) + " " + to);
+            return;
+        }
+
+        double convertedAmount = convert(amount, from, to);
+        resultLabel.setText(format(amount) + " " + from + " = " + format(convertedAmount) + " " + to);
+
+        // Store conversion in the database
+        storeConversion(from, to, amount, convertedAmount);
+    }
+
+    private void showError(String message) {
+        JOptionPane.showMessageDialog(this, message, "Input Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    private double convert(double amount, String from, String to) {
+        switch (from) {
+            case "Dollar":
+                if (to.equals("Pound")) {
+                    return amount * DOLLAR_TO_POUND;
+                } else if (to.equals("Rupee")) {
+                    return amount * DOLLAR_TO_RUPEE;
+                }
+                break;
+            case "Pound":
+                if (to.equals("Dollar")) {
+                    return amount * POUND_TO_DOLLAR;
+                } else if (to.equals("Rupee")) {
+                    return amount * POUND_TO_RUPEE;
+                }
+                break;
+            case "Rupee":
+                if (to.equals("Dollar")) {
+                    return amount * RUPEE_TO_DOLLAR;
+                } else if (to.equals("Pound")) {
+                    return amount * RUPEE_TO_POUND;
+                }
+                break;
+        }
+        return 0;
+    }
+
+    private String format(double value) {
+        DecimalFormat df = new DecimalFormat("#,##0.00");
+        return df.format(value);
+    }
+
+    private void storeConversion(String from, String to, double amount, double convertedAmount) {
+        String sql = "INSERT INTO conversions (from_currency, to_currency, amount, converted_amount) VALUES (?, ?, ?, ?)";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, from);
+            pstmt.setString(2, to);
+            pstmt.setDouble(3, amount);
+            pstmt.setDouble(4, convertedAmount);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            showError("Database error: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            CurrencyConverter converter = new CurrencyConverter();
+            converter.setVisible(true);
+        });
+    }
+}
