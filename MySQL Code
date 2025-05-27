@@ -1,0 +1,15 @@
+CREATE DATABASE IF NOT EXISTS currencydb;
+
+USE currencydb;
+
+CREATE TABLE IF NOT EXISTS conversions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    from_currency VARCHAR(10),
+    to_currency VARCHAR(10),
+    amount DECIMAL(10,2),
+    converted_amount DECIMAL(10,2),
+    conversion_date TIMEST
+AMP DEFAULT CURRENT_TIMESTAMP
+);
+
+SELECT * FROM conversions;
